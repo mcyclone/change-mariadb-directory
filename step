@@ -1,33 +1,76 @@
-Stop the MariaDB Service:
-First, stop the MariaDB service to ensure no database operations are occurring during the move.
 
-sh
-Copy code
-sudo systemctl stop mariadb
-Create a New Directory:
-Create a new directory in /home where you want to store the MariaDB data.
+1. **Stop the MariaDB Service:**
+   ```sh
+   sudo systemctl stop mariadb
+   ```
 
-sh
-Copy code
-sudo mkdir /home/mysql
-sudo chown mysql:mysql /home/mysql
-Copy Existing Data:
-Copy the existing database files to the new location.
+2. **Create a New Directory:**
+   Create a new directory under `/home` to store MariaDB data.
+   ```sh
+   sudo mkdir /home/mysql
+   sudo chown mysql:mysql /home/mysql
+   ```
 
-sh
-Copy code
-sudo cp -R /var/lib/mysql/* /home/mysql/
-sudo chown -R mysql:mysql /home/mysql
-Update the MariaDB Configuration:
-Update the MariaDB configuration file to point to the new data directory. This file is typically located at /etc/mysql/my.cnf or /etc/my.cnf. Open the configuration file with your preferred text editor.
+3. **Copy Existing Data:**
+   Copy the existing MariaDB data to the new directory.
+   ```sh
+   sudo cp -R /var/lib/mysql/* /home/mysql/
+   sudo chown -R mysql:mysql /home/mysql
+   ```
 
-sh
-Copy code
-sudo nano /etc/mysql/my.cnf
-Look for the [mysqld] section and change the datadir option:
+4. **Update the MariaDB Configuration:**
+   Edit the MariaDB configuration to point to the new data directory. The configuration files are typically found in `/etc/my.cnf.d/`.
+   ```sh
+   sudo nano /etc/my.cnf.d/server.cnf
+   ```
+   Find the `[mysqld]` section and change the `datadir` directive:
+   ```ini
+   [mysqld]
+   datadir=/home/mysql
+   ```
+   Save and close the file.
 
-ini
-Copy code
-[mysqld]
-datadir=/home/mysql
-Save and close the file.
+5. **Update SELinux Configuration (if applicable):**
+   If SELinux is enabled, update its configuration to allow MariaDB to access the new data directory:
+   ```sh
+   sudo semanage fcontext -a -t mysqld_db_t "/home/mysql(/.*)?"
+   sudo restorecon -Rv /home/mysql
+   ```
+   If `semanage` is not installed, install it using:
+   ```sh
+   sudo dnf install policycoreutils-python-utils
+   ```
+
+6. **Update AppArmor Configuration (if applicable):**
+   If your system uses AppArmor, edit the profile for MariaDB to include the new data directory. This profile is typically located at `/etc/apparmor.d/usr.sbin.mysqld`.
+   ```sh
+   sudo nano /etc/apparmor.d/usr.sbin.mysqld
+   ```
+   Update any paths from `/var/lib/mysql` to `/home/mysql`. For example:
+   ```plaintext
+   /var/lib/mysql/ r,
+   /var/lib/mysql/** rwk,
+   ```
+   Change to:
+   ```plaintext
+   /home/mysql/ r,
+   /home/mysql/** rwk,
+   ```
+   Save and close the file. Reload AppArmor profiles:
+   ```sh
+   sudo systemctl reload apparmor
+   ```
+
+7. **Start the MariaDB Service:**
+   ```sh
+   sudo systemctl start mariadb
+   ```
+
+8. **Verify the New Setup:**
+   Verify that MariaDB is using the new data directory:
+   ```sh
+   sudo systemctl status mariadb
+   mysql -u root -p -e "SHOW VARIABLES LIKE 'datadir';"
+   ```
+
+By following these steps, you will have successfully moved your MariaDB data directory to `/home/mysql` on AlmaLinux, ensuring that MariaDB uses the new directory and operates correctly.
